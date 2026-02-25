@@ -1,0 +1,544 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>≪ご予約前チェック≫</title>
+
+  <style>
+    :root{
+      --bg:#f2f2f2;
+      --line:#e6e6e6;
+      --text:#222;
+      --muted:#777;
+      --card:#fff;
+      --radius:6px;
+      --dark:#222;
+    }
+    *{ box-sizing:border-box; }
+    body{
+      margin:0;
+      background:var(--bg);
+      color:var(--text);
+      font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Noto Sans JP",sans-serif;
+    }
+    .titlebar{
+      background:#efefef;
+      border-bottom:1px solid var(--line);
+      padding:12px 14px;
+      text-align:center;
+      font-weight:800;
+      letter-spacing:.02em;
+      position:sticky;
+      top:0;
+      z-index:10;
+    }
+    .sheet{
+      max-width:720px;
+      margin:0 auto;
+      background:var(--card);
+      border-top:1px solid var(--line);
+      border-bottom:1px solid var(--line);
+    }
+    .row{
+      display:flex;
+      gap:12px;
+      padding:14px;
+      border-top:1px solid var(--line);
+      align-items:flex-start;
+    }
+    .row:first-child{ border-top:0; }
+
+    .label{
+      width:180px;
+      min-width:180px;
+      font-weight:800;
+      padding-top:10px;
+      line-height:1.2;
+    }
+    .label .req{ margin-left:4px; font-weight:900; }
+    .control{ flex:1; }
+    .hint{
+      font-size:12px;
+      color:var(--muted);
+      margin:0 0 6px;
+      line-height:1.4;
+    }
+
+    input[type="text"], input[type="tel"]{
+      width:100%;
+      height:44px;
+      padding:10px 12px;
+      border:1px solid #d6d6d6;
+      border-radius:12px;
+      font-size:16px;
+      background:#fff;
+      outline:none;
+    }
+    input[type="text"]:focus, input[type="tel"]:focus{
+      border-color:#111;
+      box-shadow:0 0 0 3px rgba(0,0,0,.06);
+    }
+
+    /* 縦並びの選択肢 */
+    .chkGrid{
+      display:flex;
+      flex-direction:column;
+      gap:10px;
+      margin-top:6px;
+    }
+    .chk{
+      width:100%;
+      display:flex;
+      align-items:flex-start;
+      gap:10px;
+      padding:12px 12px;
+      border:1px solid #d6d6d6;
+      border-radius:12px;
+      background:#fff;
+      font-weight:800;
+      user-select:none;
+      line-height:1.35;
+    }
+    .chk input{
+      margin-top:2px;
+      width:20px;
+      height:20px;
+      accent-color:#111;
+      flex:0 0 auto;
+    }
+
+    .actionsRow{
+      padding:18px 14px 22px;
+      border-top:1px solid var(--line);
+      background:#fff;
+      position:sticky;
+      bottom:0;
+      z-index:5;
+      padding-bottom:calc(22px + env(safe-area-inset-bottom));
+    }
+    .twoBtns{ display:flex; gap:12px; }
+    .pillConfirm{
+      flex:1;
+      height:52px;
+      border-radius:999px;
+      font-size:16px;
+      font-weight:900;
+      cursor:pointer;
+      border:2px solid #111;
+      background:#fff;
+      color:#111;
+    }
+
+    /* confirm view */
+    .confirm{ display:none; padding:14px; }
+    .confirm h2{ margin:8px 0 12px; font-size:18px; }
+    .summary{
+      border:1px solid var(--line);
+      border-radius:12px;
+      overflow:hidden;
+      background:#fff;
+    }
+    .sumRow{
+      display:flex;
+      gap:12px;
+      padding:12px 14px;
+      border-top:1px solid var(--line);
+    }
+    .sumRow:first-child{ border-top:0; }
+    .sumKey{
+      width:200px;
+      min-width:200px;
+      color:#111;
+      font-weight:900;
+    }
+    .sumVal{ flex:1; color:#222; word-break:break-word; white-space:pre-wrap; }
+    .confirmActions{ display:flex; gap:12px; margin-top:14px; }
+    .ghost{
+      flex:1;
+      height:52px;
+      border-radius:999px;
+      border:2px solid #666;
+      background:#fff;
+      font-size:16px;
+      font-weight:900;
+      cursor:pointer;
+      color:#111;
+    }
+    .send{
+      flex:1;
+      height:52px;
+      border-radius:999px;
+      border:0;
+      background:var(--dark);
+      color:#fff;
+      font-size:16px;
+      font-weight:900;
+      cursor:pointer;
+    }
+
+    /* スマホ最適化 */
+    html{ -webkit-text-size-adjust:100%; }
+    .sheet{ max-width:640px; width:100%; }
+    .row{
+      display:grid;
+      grid-template-columns:140px 1fr;
+      align-items:center;
+      gap:10px;
+    }
+    .label{ width:auto; min-width:0; padding-top:0; font-size:15px; }
+    @media (max-width:380px){
+      .row{ grid-template-columns:1fr; align-items:start; }
+      .label{ padding-top:0; }
+      .sumKey{ width:140px; min-width:140px; }
+    }
+
+    .dividerNote{
+      padding:12px 14px 0;
+      color:#111;
+      font-weight:900;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="titlebar">≪ご予約前チェック≫</div>
+
+  <!-- 入力画面 -->
+  <main class="sheet" id="inputView">
+    <form id="surveyForm" novalidate>
+
+      <div class="row">
+        <div class="label">お名前<span class="req">*</span></div>
+        <div class="control">
+          <p class="hint">フルネームでご入力ください。</p>
+          <input type="text" id="name" name="name" autocomplete="name" required />
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="label">電話番号<span class="req">*</span></div>
+        <div class="control">
+          <p class="hint">ハイフンなしでもOK（例：09012345678）。</p>
+          <input type="tel" id="phone" name="phone" inputmode="tel" autocomplete="tel" required />
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="label">ご希望メニュー<span class="req">*</span></div>
+        <div class="control">
+          <p class="hint">いずれか1つを選択してください。</p>
+          <div class="chkGrid">
+            <label class="chk">
+              <input type="radio" name="menu" value="脱毛" required />
+              脱毛
+            </label>
+            <label class="chk">
+              <input type="radio" name="menu" value="ヒゲ脱毛" />
+              ヒゲ脱毛
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <div class="dividerNote" id="noteTitle" style="display:none;">注意事項（全てチェック必須）</div>
+
+      <!-- 注意事項：脱毛 -->
+      <div class="row" id="bodyMenuBlock" style="display:none;">
+        <div class="label">脱毛：確認<span class="req">*</span></div>
+        <div class="control">
+          <p class="hint">✅が付いている項目は全てチェックしてください（未チェックがあると送信できません）。</p>
+          <div class="chkGrid" id="bodyChecks">
+            <label class="chk">
+              <input type="checkbox" name="body_ack" value="保湿（化粧水→乳液/クリーム）をしっかり行う" />
+              お風呂上がりや洗顔後は、化粧水→乳液又はクリームで、しっかり保湿してください！<br>
+              保湿してあるかないかで脱毛効果がかなり変わってきます！！
+            </label>
+            <label class="chk">
+              <input type="checkbox" name="body_ack" value="当日は化粧水・乳液/クリームまでOK（日焼け止めはNG）" />
+              脱毛当日は化粧水と乳液やクリームまでOKです。日焼け止めなどは塗らずにお越しください。
+            </label>
+            <label class="chk">
+              <input type="checkbox" name="body_ack" value="脱毛箇所は前日までにシェービング（剃り残し無し）" />
+              脱毛箇所は前日までにしっかりシェービングしてお越しください。剃り残しがないようお願い致します！<br>
+              当日深剃りされると皮膚が覆い被さってしまい、脱毛効果が低下してしまいます。
+            </label>
+            <label class="chk">
+              <input type="checkbox" name="body_ack" value="皮膚疾患/通院中/持病がある場合は事前申告" />
+              ※皮膚疾患、現在通院中のケガや病気、持病などあられる場合は事前にお知らせください。<br>
+              場合によっては脱毛できない場合もありますのでご了承ください。
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <!-- 注意事項：ヒゲ脱毛 -->
+      <div class="row" id="beardMenuBlock" style="display:none;">
+        <div class="label">ヒゲ脱毛：確認<span class="req">*</span></div>
+        <div class="control">
+          <p class="hint">✅が付いている項目は全てチェックしてください（未チェックがあると送信できません）。</p>
+          <div class="chkGrid" id="beardChecks">
+            <label class="chk">
+              <input type="checkbox" name="beard_ack" value="保湿（化粧水→乳液/クリーム）をしっかり行う" />
+              お風呂上がりや洗顔後は、化粧水→乳液やクリームで、しっかり保湿してください！<br>
+              乾燥していると脱毛効果がかなり低下し、痛みも感じやすくなります。
+            </label>
+            <label class="chk">
+              <input type="checkbox" name="beard_ack" value="当日は化粧水・クリームで保湿（日焼け止めはNG）" />
+              当日は化粧水とクリームでしっかり保湿してご来店ください。<br>
+              日焼け止めなどは塗らずにお越しください。
+            </label>
+            <label class="chk">
+              <input type="checkbox" name="beard_ack" value="ヒゲは前日 or 当日朝までにシェービング（深剃りNG / 長すぎNG）" />
+              ヒゲは前日か、当日の朝までにシェービングをお願いします。<br>
+              当日剃られる場合は深ぞりせず、シェーバーを軽く当てて剃ってください。<br>
+              深ぞりして皮膚が覆い被さってしまうと脱毛効果が低下してしまいます。<br>
+              逆に、0.5mm以上伸びている場合も、効果が低下してしまいますので、<br>
+              0.1mm ~0.3mmを目標に剃ってご来店ください🙇‍♀️
+            </label>
+            <label class="chk">
+              <input type="checkbox" name="beard_ack" value="皮膚疾患/通院中/持病がある場合は事前申告（医師相談含む）" />
+              ※皮膚疾患、現在通院中のケガや病気、持病などがある場合は事前にお知らせください。<br>
+              場合によっては脱毛できない場合もあります。通院中の方は担当医師にご相談の上ご来店ください。
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <div class="actionsRow">
+        <div class="twoBtns">
+          <button class="pillConfirm" type="button" id="toConfirm">確認</button>
+        </div>
+      </div>
+
+    </form>
+  </main>
+
+  <!-- 確認画面 -->
+  <main class="sheet confirm" id="confirmView" aria-live="polite">
+    <div style="padding:14px;">
+      <h2>入力内容の確認</h2>
+      <div class="summary" id="summary"></div>
+
+      <div class="confirmActions">
+        <button class="ghost" type="button" id="backBtn">戻る</button>
+        <button class="send" type="button" id="sendBtn">送信</button>
+      </div>
+    </div>
+  </main>
+
+  <!-- LIFF -->
+  <script src="https://static.line-scdn.net/liff/edge/2.1/sdk.js"></script>
+
+  <script>
+    // ★必要に応じて差し替えてください
+    const LIFF_ID = "2007888985-ojqUTuA2";
+
+    const el = (id) => document.getElementById(id);
+
+    const inputView = el("inputView");
+    const confirmView = el("confirmView");
+    const summaryEl = el("summary");
+
+    const toConfirm = el("toConfirm");
+    const backBtn = el("backBtn");
+    const sendBtn = el("sendBtn");
+
+    const noteTitle = el("noteTitle");
+    const bodyMenuBlock = el("bodyMenuBlock");
+    const beardMenuBlock = el("beardMenuBlock");
+
+    document.addEventListener("DOMContentLoaded", async () => {
+      try { await liff.init({ liffId: LIFF_ID }); }
+      catch (e) { console.warn("LIFF init failed (ブラウザ確認中はOK):", e); }
+
+      // 初期表示制御
+      applyMenuVisibility("");
+    });
+
+    function escapeHtml(s){
+      return String(s ?? "")
+        .replaceAll("&","&amp;")
+        .replaceAll("<","&lt;")
+        .replaceAll(">","&gt;")
+        .replaceAll('"',"&quot;")
+        .replaceAll("'","&#039;");
+    }
+
+    function normalizePhone(raw){
+      return String(raw ?? "").replace(/[^\d]/g, "");
+    }
+
+    function getSelectedMenu(){
+      return document.querySelector('input[name="menu"]:checked')?.value || "";
+    }
+
+    function applyMenuVisibility(menu){
+      // 表示切替
+      const showBody = menu === "脱毛";
+      const showBeard = menu === "ヒゲ脱毛";
+
+      noteTitle.style.display = (showBody || showBeard) ? "block" : "none";
+      bodyMenuBlock.style.display = showBody ? "block" : "none";
+      beardMenuBlock.style.display = showBeard ? "block" : "none";
+
+      // 非表示側のチェックをリセット（誤判定防止）
+      if(showBody){
+        document.querySelectorAll('input[name="beard_ack"]').forEach(c => c.checked = false);
+      }else if(showBeard){
+        document.querySelectorAll('input[name="body_ack"]').forEach(c => c.checked = false);
+      }else{
+        document.querySelectorAll('input[name="body_ack"], input[name="beard_ack"]').forEach(c => c.checked = false);
+      }
+    }
+
+    // メニュー変更で注意事項表示切替
+    document.addEventListener("change", (e) => {
+      if(e.target && e.target.name === "menu"){
+        applyMenuVisibility(getSelectedMenu());
+      }
+    });
+
+    function getAcknowledgements(menu){
+      if(menu === "脱毛"){
+        return Array.from(document.querySelectorAll('input[name="body_ack"]:checked')).map(x => x.value);
+      }
+      if(menu === "ヒゲ脱毛"){
+        return Array.from(document.querySelectorAll('input[name="beard_ack"]:checked')).map(x => x.value);
+      }
+      return [];
+    }
+
+    function requiredAckCount(menu){
+      if(menu === "脱毛"){
+        return document.querySelectorAll('input[name="body_ack"]').length;
+      }
+      if(menu === "ヒゲ脱毛"){
+        return document.querySelectorAll('input[name="beard_ack"]').length;
+      }
+      return 0;
+    }
+
+    function getFormData(){
+      const name = el("name").value.trim();
+      const phoneRaw = el("phone").value.trim();
+      const phone = normalizePhone(phoneRaw);
+      const menu = getSelectedMenu();
+      const acks = getAcknowledgements(menu);
+      return { name, phoneRaw, phone, menu, acks };
+    }
+
+    function validate(){
+      const d = getFormData();
+
+      if(!d.name){
+        alert("お名前を入力してください。");
+        return null;
+      }
+      if(!d.phoneRaw){
+        alert("電話番号を入力してください。");
+        return null;
+      }
+      if(d.phone.length < 10 || d.phone.length > 11){
+        alert("電話番号を正しく入力してください。（10〜11桁）");
+        return null;
+      }
+      if(!d.menu){
+        alert("ご希望メニューを選択してください。");
+        return null;
+      }
+
+      const need = requiredAckCount(d.menu);
+      const got = d.acks.length;
+      if(got !== need){
+        alert("注意事項の✅項目は全てチェックしてください。");
+        return null;
+      }
+
+      return d;
+    }
+
+    function buildSummary(d){
+      const rows = [
+        ["お名前", d.name],
+        ["電話番号", d.phoneRaw],
+        ["ご希望メニュー", d.menu],
+        ["確認チェック", "全てチェック済み✅\n・" + d.acks.join("\n・")],
+      ];
+
+      summaryEl.innerHTML = rows.map(([k,v]) => `
+        <div class="sumRow">
+          <div class="sumKey">${escapeHtml(k)}</div>
+          <div class="sumVal">${escapeHtml(v)}</div>
+        </div>
+      `).join("");
+    }
+
+    function buildSendText(d){
+      // メニュー別の応援メッセージ（ご希望に合わせて入れています）
+      const bodyClosing =
+`脱毛完了までの期間には個人差はあります。ゴールまでには回数がかかるため根気が必要です。
+でも、ムダ毛のない自己処理不要の快適な毎日になること間違いなしです👍
+一緒に頑張りましょう！！！よろしくお願い致します🙇‍♀️`;
+
+      const beardClosing =
+`脱毛は個人差はありますが、回数がかかるため根気が必要です。
+髭剃り卒業目指して一緒に頑張りましょう！
+ご来店を楽しみにお待ちしています😊🤚`;
+
+      const closing = (d.menu === "脱毛") ? bodyClosing : beardClosing;
+
+      return `≪ご予約前チェック≫
+【お名前】${d.name}
+【電話番号】${d.phoneRaw}
+【ご希望メニュー】${d.menu}
+
+【確認チェック（全て了承）】
+・${d.acks.join("\n・")}
+
+${closing}`;
+    }
+
+    // confirm step
+    toConfirm.addEventListener("click", () => {
+      const d = validate();
+      if(!d) return;
+
+      buildSummary(d);
+
+      inputView.style.display = "none";
+      confirmView.style.display = "block";
+      window.scrollTo({ top:0, behavior:"smooth" });
+    });
+
+    // back
+    backBtn.addEventListener("click", () => {
+      confirmView.style.display = "none";
+      inputView.style.display = "block";
+      window.scrollTo({ top:0, behavior:"smooth" });
+    });
+
+    // send
+    sendBtn.addEventListener("click", async () => {
+      const d = validate();
+      if(!d) return;
+
+      const text = buildSendText(d);
+
+      try{
+        if(window.liff && liff.isInClient && liff.isInClient()){
+          await liff.sendMessages([{ type:"text", text }]);
+          alert("送信しました。ありがとうございました。");
+          liff.closeWindow();
+        }else{
+          alert("（ブラウザ確認）送信テキストをコンソールに出力しました。");
+          console.log(text);
+        }
+      }catch(e){
+        console.error(e);
+        alert("送信に失敗しました。もう一度お試しください。");
+      }
+    });
+  </script>
+</body>
+</html>
