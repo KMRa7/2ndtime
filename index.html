@@ -12,7 +12,6 @@
       --text:#222;
       --muted:#777;
       --card:#fff;
-      --radius:6px;
       --dark:#222;
     }
     *{ box-sizing:border-box; }
@@ -184,19 +183,6 @@
       cursor:pointer;
     }
 
-    .statusBox{
-      margin:12px 14px 0;
-      padding:12px 14px;
-      border-radius:12px;
-      background:#fff8e6;
-      border:1px solid #f0d999;
-      color:#222;
-      font-size:13px;
-      line-height:1.6;
-      white-space:pre-wrap;
-      display:none;
-    }
-
     html{ -webkit-text-size-adjust:100%; }
     .sheet{ max-width:640px; width:100%; }
     .row{
@@ -222,10 +208,6 @@
 
 <body>
   <div class="titlebar">≪カウンセリングシート≫</div>
-
-  <div class="sheet">
-    <div id="statusBox" class="statusBox"></div>
-  </div>
 
   <!-- 入力画面 -->
   <main class="sheet" id="inputView">
@@ -266,7 +248,6 @@
 
       <div class="dividerNote" id="noteTitle" style="display:none;">注意事項（全てチェック必須）</div>
 
-      <!-- 注意事項：脱毛 -->
       <div class="row" id="bodyMenuBlock" style="display:none;">
         <div class="label">脱毛：確認<span class="req">*</span></div>
         <div class="control">
@@ -295,7 +276,6 @@
         </div>
       </div>
 
-      <!-- 注意事項：ヒゲ脱毛 -->
       <div class="row" id="beardMenuBlock" style="display:none;">
         <div class="label">ヒゲ脱毛：確認<span class="req">*</span></div>
         <div class="control">
@@ -350,11 +330,9 @@
     </div>
   </main>
 
-  <!-- LIFF -->
   <script src="https://static.line-scdn.net/liff/edge/2.1/sdk.js"></script>
 
   <script>
-    // ここをあなたのLIFF IDに差し替え
     const LIFF_ID = "2009230134-u1jfH0d6";
 
     const el = (id) => document.getElementById(id);
@@ -362,7 +340,6 @@
     const inputView = el("inputView");
     const confirmView = el("confirmView");
     const summaryEl = el("summary");
-    const statusBox = el("statusBox");
 
     const toConfirm = el("toConfirm");
     const backBtn = el("backBtn");
@@ -371,16 +348,6 @@
     const noteTitle = el("noteTitle");
     const bodyMenuBlock = el("bodyMenuBlock");
     const beardMenuBlock = el("beardMenuBlock");
-
-    function showStatus(msg, visible = true){
-      statusBox.textContent = msg;
-      statusBox.style.display = visible ? "block" : "none";
-    }
-
-    function appendStatus(msg){
-      const old = statusBox.textContent ? statusBox.textContent + "\n" : "";
-      showStatus(old + msg, true);
-    }
 
     function escapeHtml(s){
       return String(s ?? "")
@@ -404,7 +371,7 @@
       const showBeard = menu === "ヒゲ脱毛";
 
       noteTitle.style.display = (showBody || showBeard) ? "block" : "none";
-      bodyMenuBlock.style.display = showBody ? "block" : "grid";
+      bodyMenuBlock.style.display = showBody ? "grid" : "none";
       beardMenuBlock.style.display = showBeard ? "grid" : "none";
 
       if(showBody){
@@ -522,61 +489,33 @@ ${closing}`;
     }
 
     async function initLiffSafely(){
-      showStatus("LIFF初期化を確認中…");
-
-      if(!window.liff){
-        showStatus("LIFF SDKの読み込みに失敗しています。");
-        return false;
-      }
+      if(!window.liff) return false;
 
       try{
         await liff.init({ liffId: LIFF_ID });
 
-        const inClient = liff.isInClient();
-        const loggedIn = liff.isLoggedIn();
-        const context = liff.getContext?.();
-
-        console.log("LIFF init success");
-        console.log("isInClient:", inClient);
-        console.log("isLoggedIn:", loggedIn);
-        console.log("context:", context);
-
-        let message = "LIFF初期化OK";
-        message += `\nisInClient: ${inClient}`;
-        message += `\nisLoggedIn: ${loggedIn}`;
-        if(context?.type) message += `\ncontext.type: ${context.type}`;
-
-        showStatus(message);
-
-        if(!inClient && !loggedIn){
-          appendStatus("外部ブラウザのためLINEログインに進みます。");
+        if(!liff.isInClient() && !liff.isLoggedIn()){
           liff.login();
           return false;
         }
 
         return true;
       }catch(e){
-        console.error("LIFF init failed:", e);
-        showStatus("LIFF初期化に失敗しました。\nLIFF ID、エンドポイントURL、LINE Developers設定を確認してください。\n\n" + (e?.message || JSON.stringify(e)));
         return false;
       }
     }
 
     function canSendInCurrentContext(){
       try{
-        if(!window.liff) return { ok:false, reason:"LIFF SDK未読込" };
-        if(!liff.isInClient()) return { ok:false, reason:"LINEアプリ内で開かれていません" };
+        if(!window.liff) return false;
+        if(!liff.isInClient()) return false;
 
         const context = liff.getContext?.();
         const type = context?.type || "";
 
-        if(["utou", "room", "group"].includes(type)){
-          return { ok:true, reason:"送信可能コンテキスト" };
-        }
-
-        return { ok:false, reason:`送信非対応の起動コンテキストです (${type || "unknown"})` };
+        return ["utou", "room", "group"].includes(type);
       }catch(e){
-        return { ok:false, reason:e?.message || "判定失敗" };
+        return false;
       }
     }
 
@@ -609,50 +548,31 @@ ${closing}`;
       const text = buildSendText(d);
 
       try{
-        showStatus("送信処理を開始します…");
-
-        if(!window.liff){
-          alert("LIFF SDKが読み込まれていません。");
-          showStatus("LIFF SDKが読み込まれていません。");
+        const ready = await initLiffSafely();
+        if(!ready){
+          alert("LINEの起動確認ができませんでした。");
           return;
         }
 
-        const ready = await initLiffSafely();
-        if(!ready) return;
-
-        const judge = canSendInCurrentContext();
-        appendStatus(`送信判定: ${judge.reason}`);
-
-        if(!judge.ok){
-          alert("LINEトーク画面から開いたときのみ送信できます。");
+        if(!canSendInCurrentContext()){
+          alert("LINEトーク画面から開いた場合のみ送信できます。");
           return;
         }
 
         sendBtn.disabled = true;
         sendBtn.textContent = "送信中…";
 
-        console.log("send text:", text);
-
         await liff.sendMessages([
           { type:"text", text }
         ]);
 
-        showStatus("送信成功");
         alert("送信しました。ありがとうございました。");
 
         if(liff.isInClient()){
           liff.closeWindow();
         }
       }catch(e){
-        console.error("sendMessages error:", e);
-
-        const errorText =
-          "送信に失敗しました。\n\n" +
-          "message: " + (e?.message || "なし") + "\n" +
-          "raw: " + JSON.stringify(e, Object.getOwnPropertyNames(e));
-
-        showStatus(errorText);
-        alert(errorText);
+        alert("送信に失敗しました。もう一度お試しください。");
       }finally{
         sendBtn.disabled = false;
         sendBtn.textContent = "送信";
