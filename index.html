@@ -80,7 +80,6 @@
       box-shadow:0 0 0 3px rgba(0,0,0,.06);
     }
 
-    /* 縦並びの選択肢 */
     .chkGrid{
       display:flex;
       flex-direction:column;
@@ -130,7 +129,6 @@
       color:#111;
     }
 
-    /* confirm view */
     .confirm{ display:none; padding:14px; }
     .confirm h2{ margin:8px 0 12px; font-size:18px; }
     .summary{
@@ -152,8 +150,17 @@
       color:#111;
       font-weight:900;
     }
-    .sumVal{ flex:1; color:#222; word-break:break-word; white-space:pre-wrap; }
-    .confirmActions{ display:flex; gap:12px; margin-top:14px; }
+    .sumVal{
+      flex:1;
+      color:#222;
+      word-break:break-word;
+      white-space:pre-wrap;
+    }
+    .confirmActions{
+      display:flex;
+      gap:12px;
+      margin-top:14px;
+    }
     .ghost{
       flex:1;
       height:52px;
@@ -177,7 +184,19 @@
       cursor:pointer;
     }
 
-    /* スマホ最適化 */
+    .statusBox{
+      margin:12px 14px 0;
+      padding:12px 14px;
+      border-radius:12px;
+      background:#fff8e6;
+      border:1px solid #f0d999;
+      color:#222;
+      font-size:13px;
+      line-height:1.6;
+      white-space:pre-wrap;
+      display:none;
+    }
+
     html{ -webkit-text-size-adjust:100%; }
     .sheet{ max-width:640px; width:100%; }
     .row{
@@ -203,6 +222,10 @@
 
 <body>
   <div class="titlebar">≪カウンセリングシート≫</div>
+
+  <div class="sheet">
+    <div id="statusBox" class="statusBox"></div>
+  </div>
 
   <!-- 入力画面 -->
   <main class="sheet" id="inputView">
@@ -331,14 +354,15 @@
   <script src="https://static.line-scdn.net/liff/edge/2.1/sdk.js"></script>
 
   <script>
-    // ★必要に応じて差し替えてください
-    const LIFF_ID = "2007888985-ojqUTuA2";
+    // ここをあなたのLIFF IDに差し替え
+    const LIFF_ID = "2009230134-u1jfH0d6";
 
     const el = (id) => document.getElementById(id);
 
     const inputView = el("inputView");
     const confirmView = el("confirmView");
     const summaryEl = el("summary");
+    const statusBox = el("statusBox");
 
     const toConfirm = el("toConfirm");
     const backBtn = el("backBtn");
@@ -348,13 +372,15 @@
     const bodyMenuBlock = el("bodyMenuBlock");
     const beardMenuBlock = el("beardMenuBlock");
 
-    document.addEventListener("DOMContentLoaded", async () => {
-      try { await liff.init({ liffId: LIFF_ID }); }
-      catch (e) { console.warn("LIFF init failed (ブラウザ確認中はOK):", e); }
+    function showStatus(msg, visible = true){
+      statusBox.textContent = msg;
+      statusBox.style.display = visible ? "block" : "none";
+    }
 
-      // 初期表示制御
-      applyMenuVisibility("");
-    });
+    function appendStatus(msg){
+      const old = statusBox.textContent ? statusBox.textContent + "\n" : "";
+      showStatus(old + msg, true);
+    }
 
     function escapeHtml(s){
       return String(s ?? "")
@@ -374,15 +400,13 @@
     }
 
     function applyMenuVisibility(menu){
-      // 表示切替
       const showBody = menu === "脱毛";
       const showBeard = menu === "ヒゲ脱毛";
 
       noteTitle.style.display = (showBody || showBeard) ? "block" : "none";
-      bodyMenuBlock.style.display = showBody ? "block" : "none";
-      beardMenuBlock.style.display = showBeard ? "block" : "none";
+      bodyMenuBlock.style.display = showBody ? "block" : "grid";
+      beardMenuBlock.style.display = showBeard ? "grid" : "none";
 
-      // 非表示側のチェックをリセット（誤判定防止）
       if(showBody){
         document.querySelectorAll('input[name="beard_ack"]').forEach(c => c.checked = false);
       }else if(showBeard){
@@ -392,7 +416,6 @@
       }
     }
 
-    // メニュー変更で注意事項表示切替
     document.addEventListener("change", (e) => {
       if(e.target && e.target.name === "menu"){
         applyMenuVisibility(getSelectedMenu());
@@ -475,7 +498,6 @@
     }
 
     function buildSendText(d){
-      // メニュー別の応援メッセージ（ご希望に合わせて入れています）
       const bodyClosing =
 `脱毛完了までの期間には個人差はあります。ゴールまでには回数がかかるため根気が必要です。
 でも、ムダ毛のない自己処理不要の快適な毎日になること間違いなしです👍
@@ -499,7 +521,70 @@
 ${closing}`;
     }
 
-    // confirm step
+    async function initLiffSafely(){
+      showStatus("LIFF初期化を確認中…");
+
+      if(!window.liff){
+        showStatus("LIFF SDKの読み込みに失敗しています。");
+        return false;
+      }
+
+      try{
+        await liff.init({ liffId: LIFF_ID });
+
+        const inClient = liff.isInClient();
+        const loggedIn = liff.isLoggedIn();
+        const context = liff.getContext?.();
+
+        console.log("LIFF init success");
+        console.log("isInClient:", inClient);
+        console.log("isLoggedIn:", loggedIn);
+        console.log("context:", context);
+
+        let message = "LIFF初期化OK";
+        message += `\nisInClient: ${inClient}`;
+        message += `\nisLoggedIn: ${loggedIn}`;
+        if(context?.type) message += `\ncontext.type: ${context.type}`;
+
+        showStatus(message);
+
+        if(!inClient && !loggedIn){
+          appendStatus("外部ブラウザのためLINEログインに進みます。");
+          liff.login();
+          return false;
+        }
+
+        return true;
+      }catch(e){
+        console.error("LIFF init failed:", e);
+        showStatus("LIFF初期化に失敗しました。\nLIFF ID、エンドポイントURL、LINE Developers設定を確認してください。\n\n" + (e?.message || JSON.stringify(e)));
+        return false;
+      }
+    }
+
+    function canSendInCurrentContext(){
+      try{
+        if(!window.liff) return { ok:false, reason:"LIFF SDK未読込" };
+        if(!liff.isInClient()) return { ok:false, reason:"LINEアプリ内で開かれていません" };
+
+        const context = liff.getContext?.();
+        const type = context?.type || "";
+
+        if(["utou", "room", "group"].includes(type)){
+          return { ok:true, reason:"送信可能コンテキスト" };
+        }
+
+        return { ok:false, reason:`送信非対応の起動コンテキストです (${type || "unknown"})` };
+      }catch(e){
+        return { ok:false, reason:e?.message || "判定失敗" };
+      }
+    }
+
+    document.addEventListener("DOMContentLoaded", async () => {
+      applyMenuVisibility("");
+      await initLiffSafely();
+    });
+
     toConfirm.addEventListener("click", () => {
       const d = validate();
       if(!d) return;
@@ -511,14 +596,12 @@ ${closing}`;
       window.scrollTo({ top:0, behavior:"smooth" });
     });
 
-    // back
     backBtn.addEventListener("click", () => {
       confirmView.style.display = "none";
       inputView.style.display = "block";
       window.scrollTo({ top:0, behavior:"smooth" });
     });
 
-    // send
     sendBtn.addEventListener("click", async () => {
       const d = validate();
       if(!d) return;
@@ -526,17 +609,53 @@ ${closing}`;
       const text = buildSendText(d);
 
       try{
-        if(window.liff && liff.isInClient && liff.isInClient()){
-          await liff.sendMessages([{ type:"text", text }]);
-          alert("送信しました。ありがとうございました。");
+        showStatus("送信処理を開始します…");
+
+        if(!window.liff){
+          alert("LIFF SDKが読み込まれていません。");
+          showStatus("LIFF SDKが読み込まれていません。");
+          return;
+        }
+
+        const ready = await initLiffSafely();
+        if(!ready) return;
+
+        const judge = canSendInCurrentContext();
+        appendStatus(`送信判定: ${judge.reason}`);
+
+        if(!judge.ok){
+          alert("LINEトーク画面から開いたときのみ送信できます。");
+          return;
+        }
+
+        sendBtn.disabled = true;
+        sendBtn.textContent = "送信中…";
+
+        console.log("send text:", text);
+
+        await liff.sendMessages([
+          { type:"text", text }
+        ]);
+
+        showStatus("送信成功");
+        alert("送信しました。ありがとうございました。");
+
+        if(liff.isInClient()){
           liff.closeWindow();
-        }else{
-          alert("（ブラウザ確認）送信テキストをコンソールに出力しました。");
-          console.log(text);
         }
       }catch(e){
-        console.error(e);
-        alert("送信に失敗しました。もう一度お試しください。");
+        console.error("sendMessages error:", e);
+
+        const errorText =
+          "送信に失敗しました。\n\n" +
+          "message: " + (e?.message || "なし") + "\n" +
+          "raw: " + JSON.stringify(e, Object.getOwnPropertyNames(e));
+
+        showStatus(errorText);
+        alert(errorText);
+      }finally{
+        sendBtn.disabled = false;
+        sendBtn.textContent = "送信";
       }
     });
   </script>
